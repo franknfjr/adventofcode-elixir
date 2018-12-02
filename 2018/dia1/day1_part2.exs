@@ -1,21 +1,27 @@
 defmodule Day1 do
   def repeated_frequency(file_stream) do
-    file_stream
-    |> String.split("\n", trim: true)
-    |> Stream.map(fn line ->
-      {integer, _leftover} = Integer.parse(line)
-      integer
-    end)
-    |> Stream.cycle()
-    |> Enum.reduce_while({0, []}, fn x, {current_frequency, seen_frequencies} ->
-      new_frequency = current_frequency + x
+    Task.async(fn ->
+      Process.put({__MODULE__, 0}, true)
+      file_stream
+      |> String.split("\n", trim: true)
+      |> Stream.map(fn line ->
+        {integer, _leftover} = Integer.parse(line)
+        integer
+      end)
+      |> Stream.cycle()
+      |> Enum.reduce_while(0, fn x, current_frequency ->
+        new_frequency = current_frequency + x
+        key = {__MODULE__, new_frequency}
 
-      if new_frequency in seen_frequencies do
-        {:halt, new_frequency}
-      else
-        {:cont, {new_frequency, [new_frequency | seen_frequencies]}}
-      end
+        if Process.get(key) do
+          {:halt, new_frequency}
+        else
+          Process.put({__MODULE__, new_frequency}, true)
+          {:cont, new_frequency}
+        end
+      end)
     end)
+    |> Task.await(:infinity)
   end
 end
 
@@ -29,11 +35,12 @@ case System.argv() do
       import Day1
 
       test "repeated_frequency" do
-        assert repeated_frequency("""
-               +1
-               +1
-               +1
-               """) == 3
+        assert repeated_frequency([
+                 "+1\n",
+                 "-2\n",
+                 "+3\n",
+                 "+1\n"
+               ]) == 2
       end
     end
 
